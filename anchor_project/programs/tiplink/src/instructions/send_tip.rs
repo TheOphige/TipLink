@@ -12,15 +12,12 @@ pub struct SendTip<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn send_tip(ctx: Context<SendTip>, amount: u64) -> Result<()> {
-    if amount == 0 {
-        return Err(error!(crate::errors::TipLinkError::InvalidAmount));
-    }
-
+pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Result<()> {
     let tip = &mut ctx.accounts.tip;
     tip.sender = *ctx.accounts.sender.key;
     tip.recipient = *ctx.accounts.recipient.key;
     tip.amount = amount;
+    tip.token_mint = token_mint;
     tip.timestamp = Clock::get()?.unix_timestamp;
     Ok(())
 }

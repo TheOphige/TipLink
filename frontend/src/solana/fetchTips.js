@@ -10,7 +10,7 @@ export const fetchTips = async (wallet, programId) => {
     const tips = await program.account.tip.all([
         {
             memcmp: {
-                offset: 32, // recipient starts at byte 32
+                offset: 32, // recipient starts at byte offset 32
                 bytes: wallet.publicKey.toBase58(),
             },
         },
@@ -19,6 +19,7 @@ export const fetchTips = async (wallet, programId) => {
     return tips.map(t => ({
         sender: t.account.sender.toBase58(),
         amount: t.account.amount.toNumber(),
+        tokenMint: t.account.tokenMint.toBase58(), // token mint address
         timestamp: t.account.timestamp.toNumber(),
     }));
 };
