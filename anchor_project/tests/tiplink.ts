@@ -1,16 +1,56 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
 import { Tiplink } from "../target/types/tiplink";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { assert } from "chai";
 
 describe("tiplink", () => {
-  // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+  const program = anchor.workspace.Tiplink as Program<Tiplink>;
+  const sender = provider.wallet.publicKey;
+  const recipient = anchor.web3.Keypair.generate().publicKey;
 
-  const program = anchor.workspace.tiplink as Program<Tiplink>;
+  it("Sends SOL tip (happy path)", async () => {
+    const [tipPDA, bump] = await PublicKey.findProgramAddress(
+      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer(), Buffer.from(Date.now().toString())],
+      program.programId
+    );
 
-  it("Is initialized!", async () => {
-    // Add your test here.
-    const tx = await program.methods.initialize().rpc();
-    console.log("Your transaction signature", tx);
+    await program.methods
+      .sendTip(new anchor.BN(1_000_000_000), SystemProgram.programId) // 1 SOL
+      .accounts({
+        tip: tipPDA,
+        sender,
+        recipient,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    const tipAccount = await program.account.tip.fetch(tipPDA);
+    assert.equal(tipAccount.amount.toNumber(), 1_000_000_000);
+    assert.equal(tipAccount.recipient.toBase58(), recipient.toBase58());
+  });
+
+  it("Fails with zero amount (unhappy path)", async () => {
+    const [tipPDA, bump] = await PublicKey.findProgramAddress(
+      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer(), Buffer.from(Date.now().toString())],
+      program.programId
+    );
+
+    try {
+      await program.methods
+        .sendTip(new anchor.BN(0), SystemProgram.programId)
+        .accounts({
+          tip: tipPDA,
+          sender,
+          recipient,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      assert.fail("Should throw error for zero amount");
+    } catch (err: any) {
+      assert.ok(err.toString().includes("InvalidAmount"));
+    }
   });
 });
