@@ -8,13 +8,27 @@ export default function SendTipForm({ programId }) {
     const [amount, setAmount] = useState("");
     const [status, setStatus] = useState("");
     const [logOnChain, setLogOnChain] = useState(true);
+    const [token, setToken] = useState("SOL"); // Default SOL
+
+    const tokenMints = {
+        USDC: "YourUSDCMintAddressHere",
+        BONK: "YourBONKMintAddressHere",
+        SOL: null,
+    };
 
     const handleSend = async () => {
         if (!publicKey) return alert("Connect wallet first");
         setStatus("Sending tip...");
         try {
-            const { solSignature, logSignature } = await sendTip({ publicKey, sendTransaction }, recipient, parseFloat(amount), programId, logOnChain);
-            setStatus(`SOL sent: ${solSignature}${logSignature ? `, Logged On-chain: ${logSignature}` : ""}`);
+            const { solSignature, logSignature } = await sendTip(
+                { publicKey, sendTransaction },
+                recipient,
+                parseFloat(amount),
+                programId,
+                logOnChain,
+                tokenMints[token]
+            );
+            setStatus(`Token sent: ${solSignature}${logSignature ? `, Logged On-chain: ${logSignature}` : ""}`);
         } catch (err) {
             console.error(err);
             setStatus("Failed to send tip");
@@ -24,7 +38,12 @@ export default function SendTipForm({ programId }) {
     return (
         <div>
             <input placeholder="Recipient Wallet" value={recipient} onChange={e => setRecipient(e.target.value)} />
-            <input placeholder="Amount (SOL)" value={amount} onChange={e => setAmount(e.target.value)} />
+            <input placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} />
+            <select value={token} onChange={e => setToken(e.target.value)}>
+                <option value="SOL">SOL</option>
+                <option value="USDC">USDC</option>
+                <option value="BONK">BONK</option>
+            </select>
             <label>
                 <input type="checkbox" checked={logOnChain} onChange={e => setLogOnChain(e.target.checked)} />
                 Log On-Chain
