@@ -1,1 +1,1 @@
-mod send_tip;
+pub mod send_tip;

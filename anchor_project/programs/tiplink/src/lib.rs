@@ -1,4 +1,9 @@
 use anchor_lang::prelude::*;
+pub mod states;
+pub mod instructions;
+pub mod errors;
+
+use instructions::send_tip::*;
 
 declare_id!("DyC9Xyx6VNyCV5BSHDss2qkoShMDMErt563DTNzz5GXA");
 
@@ -6,11 +11,7 @@ declare_id!("DyC9Xyx6VNyCV5BSHDss2qkoShMDMErt563DTNzz5GXA");
 pub mod tiplink {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
+    pub fn send_tip(ctx: Context<SendTip>, amount: u64) -> Result<()> {
+        send_tip(ctx, amount)
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
