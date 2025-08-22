@@ -12,6 +12,6 @@ pub mod tiplink {
     use super::*;
 
     pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Result<()> {
-        send_tip(ctx, amount, token_mint)
+        instructions::send_tip::send_tip(ctx, amount, token_mint)
     }
 }
