@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[account]
+// #[derive(InitSpace)]
 pub struct Tip {
     pub sender: Pubkey,
     pub recipient: Pubkey,

@@ -13,7 +13,7 @@ describe("tiplink", () => {
 
   it("Sends SOL tip (happy path)", async () => {
     const [tipPDA, bump] = await PublicKey.findProgramAddress(
-      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer(), Buffer.from(Date.now().toString())],
+      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer()],
       program.programId
     );
 
@@ -34,7 +34,7 @@ describe("tiplink", () => {
 
   it("Fails with zero amount (unhappy path)", async () => {
     const [tipPDA, bump] = await PublicKey.findProgramAddress(
-      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer(), Buffer.from(Date.now().toString())],
+      [Buffer.from("tip"), sender.toBuffer(), recipient.toBuffer()],
       program.programId
     );
 

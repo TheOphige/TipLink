@@ -1,9 +1,18 @@
 use anchor_lang::prelude::*;
 use crate::states::Tip;
+use crate::errors::*;
+
 
 #[derive(Accounts)]
 pub struct SendTip<'info> {
-    #[account(init, payer = sender, space = 8 + 32 + 32 + 8 + 32 + 8, seeds = [b"tip", sender.key().as_ref(), recipient.key().as_ref(), &Clock::get()?.unix_timestamp.to_le_bytes()], bump)]
+    #[account(
+        init, 
+        payer = sender, 
+        space = 8 + 32 + 32 + 8 + 32 + 8, //Tip::INIT_SPACE,
+        seeds = [b"tip", sender.key().as_ref(), recipient.key().as_ref()], 
+        bump,
+        constraint = tip.amount == 0 @ TipLinkError::InvalidAmount,
+    )]
     pub tip: Account<'info, Tip>,
 
     #[account(mut)]
@@ -17,7 +26,7 @@ pub struct SendTip<'info> {
 
 pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Result<()> {
     if amount == 0 {
-        return Err(error!(crate::errors::TipLinkError::InvalidAmount));
+        return Err(error!(TipLinkError::InvalidAmount));
     }
 
     let tip = &mut ctx.accounts.tip;
