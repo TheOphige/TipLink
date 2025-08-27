@@ -1,7 +1,7 @@
 import { useAnchorWallet, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import type { Idl } from '@coral-xyz/anchor';
-import { AnchorProvider, BN, Program, web3} from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program, web3 } from '@coral-xyz/anchor';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress, getMint } from '@solana/spl-token';
 import { Box, Button, Checkbox, FormControlLabel, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from '@mui/material';
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
@@ -24,6 +24,8 @@ interface TipData {
 }
 
 const BADGE_THRESHOLD = 5;
+const MINIMUM_BALANCE_FOR_TIP_ACCOUNT = 2_000_000; 
+const TRANSACTION_FEE = 5_000; 
 
 interface ErrorBoundaryProps { children: ReactNode }
 interface ErrorBoundaryState { hasError: boolean; error?: string }
@@ -163,6 +165,12 @@ const TipLink: FC = () => {
 
       const isSol = mintPubkey.equals(SystemProgram.programId);
 
+      // Check if balance is sufficient for transfer and logging
+      const requiredBalance = amountBN.toNumber() + (logOnChain ? MINIMUM_BALANCE_FOR_TIP_ACCOUNT + TRANSACTION_FEE : 0) + TRANSACTION_FEE;
+      if (isSol && balance < requiredBalance) {
+        throw new Error(`Insufficient balance: ${balance / 1e9} SOL available, need ${(requiredBalance / 1e9).toFixed(6)} SOL`);
+      }
+
       // Perform direct transfer
       const transferTx = new Transaction();
       if (isSol) {
@@ -210,6 +218,11 @@ const TipLink: FC = () => {
 
       // Log on-chain if enabled
       if (logOnChain) {
+        // Verify sufficient balance for logging
+        if (isSol && balanceAfter < MINIMUM_BALANCE_FOR_TIP_ACCOUNT + TRANSACTION_FEE) {
+          throw new Error(`Insufficient balance for logging: ${balanceAfter / 1e9} SOL available, need ${((MINIMUM_BALANCE_FOR_TIP_ACCOUNT + TRANSACTION_FEE) / 1e9).toFixed(6)} SOL`);
+        }
+
         const [tipPda, bump] = PublicKey.findProgramAddressSync(
           [Buffer.from('tip'), publicKey.toBuffer(), recipientPubkey.toBuffer()],
           PROGRAM_ID
@@ -241,10 +254,11 @@ const TipLink: FC = () => {
         });
 
         try {
-          const logSig = await program.methods
+          const logTx = await program.methods
             .sendTip(amountBN, mintPubkey)
             .accounts(accounts)
-            .rpc({ skipPreflight: false });
+            .transaction();
+          const logSig = await provider.sendAndConfirm(logTx, [], { skipPreflight: false, commitment: 'confirmed' });
           console.log('Log Sig:', logSig);
 
           // Verify Tip account
@@ -252,7 +266,7 @@ const TipLink: FC = () => {
           console.log('Tip account after logging:', tipAccount ? tipAccount.data.length : 'Not found');
         } catch (logErr: any) {
           console.error('Logging error:', logErr, 'logs:', logErr.logs, 'stack:', logErr.stack);
-          throw logErr; 
+          throw logErr;
         }
       }
 
