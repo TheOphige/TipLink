@@ -1,6 +1,6 @@
 # Project Description
 
-**Deployed Frontend URL:** LINK
+**Deployed Frontend URL:** [LINK](https://tip-link.vercel.app/)
 
 **Solana Program ID:** DyC9Xyx6VNyCV5BSHDss2qkoShMDMErt563DTNzz5GXA
 
