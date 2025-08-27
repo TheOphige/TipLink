@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::{
-    token::{self, Mint, Token, TokenAccount, Transfer},
+    token::{Mint, Token, TokenAccount},
     associated_token::AssociatedToken,
 };
 use crate::states::Tip;
@@ -13,7 +13,7 @@ pub struct SendTip<'info> {
     #[account(
         init_if_needed,
         payer = sender,
-        space = 8 + Tip::INIT_SPACE,
+        space = 8 + 129,
         seeds = [b"tip", sender.key().as_ref(), recipient.key().as_ref()],
         bump,
     )]
@@ -23,19 +23,14 @@ pub struct SendTip<'info> {
     pub sender: Signer<'info>,
     
     /// CHECK: recipient can be any wallet
-    #[account(mut)]
     pub recipient: AccountInfo<'info>,
     
-    // For SOL tips - always required
     pub system_program: Program<'info, System>,
     
-    // For SPL token tips (optional based on token_mint)
     pub mint: Option<Account<'info, Mint>>,
     
-    #[account(mut)]
     pub sender_token_account: Option<Account<'info, TokenAccount>>,
     
-    #[account(mut)]
     pub recipient_token_account: Option<Account<'info, TokenAccount>>,
     
     pub token_program: Option<Program<'info, Token>>,
@@ -55,31 +50,10 @@ pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Resul
     let recipient = &ctx.accounts.recipient;
     let system_program = &ctx.accounts.system_program;
 
-    // Determine if this is a SOL or SPL token tip
     let is_sol_tip = token_mint == system_program.key();
 
-    if is_sol_tip {
-        // Handle SOL transfer
-        let sender_lamports = sender.lamports();
-        
-        require!(
-            sender_lamports >= amount, 
-            TipLinkError::InsufficientFunds
-        );
-
-        // Transfer SOL from sender to recipient
-        system_program::transfer(
-            CpiContext::new(
-                system_program.to_account_info(),
-                system_program::Transfer {
-                    from: sender.to_account_info(),
-                    to: recipient.to_account_info(),
-                },
-            ),
-            amount,
-        )?;
-    } else {
-        // Handle SPL token transfer
+    if !is_sol_tip {
+        // Validate SPL token accounts (no transfer, just validation)
         let mint = ctx.accounts.mint
             .as_ref()
             .ok_or(TipLinkError::InvalidRecipient)?;
@@ -93,35 +67,18 @@ pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Resul
             .as_ref()
             .ok_or(TipLinkError::InvalidRecipient)?;
 
-        // Verify mint matches
         require!(
             mint.key() == token_mint,
             TipLinkError::InvalidRecipient
         );
-
-        // Verify token accounts belong to correct mint
         require!(
             sender_token_account.mint == token_mint,
             TipLinkError::InvalidRecipient
         );
-
         require!(
-            sender_token_account.amount >= amount,
-            TipLinkError::InsufficientFunds
+            recipient_token_account.mint == token_mint,
+            TipLinkError::InvalidRecipient
         );
-
-        // Transfer SPL tokens from sender to recipient
-        token::transfer(
-            CpiContext::new(
-                token_program.to_account_info(),
-                Transfer {
-                    from: sender_token_account.to_account_info(),
-                    to: recipient_token_account.to_account_info(),
-                    authority: sender.to_account_info(),
-                },
-            ),
-            amount,
-        )?;
     }
 
     // Record the tip
@@ -134,7 +91,7 @@ pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Resul
     tip.bump = ctx.bumps.tip;
 
     msg!(
-        "Tip sent: {} {} from {} to {}",
+        "Tip logged: {} {} from {} to {}",
         amount,
         if is_sol_tip { "lamports" } else { "tokens" },
         sender.key(),
