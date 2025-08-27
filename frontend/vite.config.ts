@@ -10,11 +10,16 @@ export default defineConfig({
     }),
   ],
   define: {
-    'process.env': {}, 
+    global: 'window',
   },
   resolve: {
     alias: {
       buffer: 'buffer',
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020',
     },
   },
 });
