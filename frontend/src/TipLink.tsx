@@ -1,10 +1,11 @@
 import { useAnchorWallet, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import type { Idl } from '@coral-xyz/anchor';
-import { AnchorProvider, BN, Program, web3 } from '@coral-xyz/anchor';
+import type {Idl} from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program, web3} from '@coral-xyz/anchor';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress, getMint } from '@solana/spl-token';
 import { Box, Button, Checkbox, FormControlLabel, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from '@mui/material';
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { Buffer } from 'buffer'; 
 import idl from './idl.json';
 import type { FC, ReactNode } from 'react';
 import { Component, useCallback, useEffect, useMemo, useState } from 'react';
