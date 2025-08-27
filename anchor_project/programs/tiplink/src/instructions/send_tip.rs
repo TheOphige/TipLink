@@ -53,7 +53,7 @@ pub fn send_tip(ctx: Context<SendTip>, amount: u64, token_mint: Pubkey) -> Resul
     let is_sol_tip = token_mint == system_program.key();
 
     if !is_sol_tip {
-        // Validate SPL token accounts (no transfer, just validation)
+        // Validate SPL token accounts 
         let mint = ctx.accounts.mint
             .as_ref()
             .ok_or(TipLinkError::InvalidRecipient)?;

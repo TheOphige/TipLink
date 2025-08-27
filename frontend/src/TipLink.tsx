@@ -252,7 +252,7 @@ const TipLink: FC = () => {
           console.log('Tip account after logging:', tipAccount ? tipAccount.data.length : 'Not found');
         } catch (logErr: any) {
           console.error('Logging error:', logErr, 'logs:', logErr.logs, 'stack:', logErr.stack);
-          throw logErr; // Re-throw to handle in outer catch
+          throw logErr; 
         }
       }
 
