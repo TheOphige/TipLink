@@ -1,11 +1,11 @@
 import { useAnchorWallet, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import type { Idl } from '@coral-xyz/anchor';
-import { AnchorProvider, BN, Program, web3 } from '@coral-xyz/anchor';
+import type {Idl} from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program, web3} from '@coral-xyz/anchor';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress, getMint } from '@solana/spl-token';
 import { Box, Button, Checkbox, FormControlLabel, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from '@mui/material';
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
-import { Buffer } from 'buffer'; // Buffer polyfill for browser
+import { Buffer } from 'buffer'; 
 import idl from './idl.json';
 import type { FC, ReactNode } from 'react';
 import { Component, useCallback, useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,8 @@ interface TipData {
 }
 
 const BADGE_THRESHOLD = 5;
+const MINIMUM_BALANCE_FOR_TIP_ACCOUNT = 2_000_000; 
+const TRANSACTION_FEE = 5_000; 
 
 interface ErrorBoundaryProps { children: ReactNode }
 interface ErrorBoundaryState { hasError: boolean; error?: string }
@@ -155,6 +157,7 @@ const TipLink: FC = () => {
     console.log('Sending tip:', { recipient, amount, tokenMint, logOnChain });
 
     try {
+      // Check sender balance
       const balance = await connection.getBalance(publicKey);
       console.log('Sender balance:', balance / 1e9, 'SOL');
 
@@ -165,6 +168,7 @@ const TipLink: FC = () => {
 
       const isSol = mintPubkey.equals(SystemProgram.programId);
 
+      // Perform direct transfer
       const transferTx = new Transaction();
       if (isSol) {
         transferTx.add(
@@ -206,10 +210,17 @@ const TipLink: FC = () => {
       console.log('Transfer Sig:', transferSig);
       setSuccess('Transfer successful');
 
+      // Check balance after transfer
       const balanceAfter = await connection.getBalance(publicKey);
       console.log('Sender balance after transfer:', balanceAfter / 1e9, 'SOL');
 
+      // Log on-chain if enabled
       if (logOnChain) {
+        // Verify sufficient balance for logging
+        if (isSol && balanceAfter < MINIMUM_BALANCE_FOR_TIP_ACCOUNT + TRANSACTION_FEE) {
+          throw new Error(`Insufficient balance for logging: ${balanceAfter / 1e9} SOL available, need ${((MINIMUM_BALANCE_FOR_TIP_ACCOUNT + TRANSACTION_FEE) / 1e9).toFixed(6)} SOL`);
+        }
+
         const [tipPda, bump] = PublicKey.findProgramAddressSync(
           [Buffer.from('tip'), publicKey.toBuffer(), recipientPubkey.toBuffer()],
           PROGRAM_ID
@@ -240,19 +251,27 @@ const TipLink: FC = () => {
           associatedTokenProgram: accounts.associatedTokenProgram ? accounts.associatedTokenProgram.toBase58() : null,
         });
 
-        const logSig = await program.methods
-          .sendTip(amountBN, mintPubkey)
-          .accounts(accounts)
-          .rpc();
-        console.log('Log Sig:', logSig);
+        try {
+          const logTx = await program.methods
+            .sendTip(amountBN, mintPubkey)
+            .accounts(accounts)
+            .transaction();
+          const logSig = await provider.sendAndConfirm(logTx, [], { skipPreflight: false, commitment: 'confirmed' });
+          console.log('Log Sig:', logSig);
 
-        const tipAccount = await connection.getAccountInfo(tipPda);
-        console.log('Tip account after logging:', tipAccount ? tipAccount.data.length : 'Not found');
+          // Verify Tip account
+          const tipAccount = await connection.getAccountInfo(tipPda);
+          console.log('Tip account after logging:', tipAccount ? tipAccount.data.length : 'Not found');
+        } catch (logErr: any) {
+          console.error('Logging error:', logErr, 'logs:', logErr.logs, 'stack:', logErr.stack);
+          throw logErr;
+        }
       }
 
+      // Fetch updated tips
       await fetchAllTips();
     } catch (err: any) {
-      console.error('Send tip error:', err);
+      console.error('Send tip error:', err, 'logs:', err.logs, 'stack:', err.stack);
       const errorMap: { [code: number]: string } = {
         6000: 'Invalid recipient address',
         6001: 'Amount must be greater than zero',
@@ -261,7 +280,8 @@ const TipLink: FC = () => {
       };
       const errorCode = err.logs?.find((log: string) => log.includes('ProgramError'))?.match(/Error Code: (\w+)/)?.[1];
       const errorMsg = errorCode ? errorMap[parseInt(errorCode.slice(-4))] || err.message : err.message;
-      setError(errorMsg || 'Transaction failed');
+      setError(errorMsg || 'Transaction failed. Check console for details.');
+      // Fetch tips even if logging fails
       await fetchAllTips();
     } finally {
       setLoading(false);
@@ -296,7 +316,7 @@ const TipLink: FC = () => {
           <Paper sx={{ p: 2, mt: 2 }}>
             <Typography variant="h6">Send Tip</Typography>
             <TextField label="Recipient Address" value={recipient} onChange={e => setRecipient(e.target.value)} fullWidth sx={{ mb: 2 }} />
-            <TextField label="Amount" value={amount} onChange={e => setAmount(e.target.value)} fullWidth sx={ { mb: 2 } } />
+            <TextField label="Amount" value={amount} onChange={e => setAmount(e.target.value)} fullWidth sx={{ mb: 2 }} />
             <TextField label="Token Mint (blank for SOL)" value={tokenMint} onChange={e => setTokenMint(e.target.value)} fullWidth sx={{ mb: 2 }} />
             <FormControlLabel control={<Checkbox checked={logOnChain} onChange={e => setLogOnChain(e.target.checked)} />} label="Log on-chain (for history, gamification)" />
             <Button variant="contained" onClick={handleSendTip} disabled={loading}>Send Tip</Button>
@@ -324,7 +344,7 @@ const TipLink: FC = () => {
           )}
 
           {tabValue === 2 && (
-            <Paper sx={ { p: 2, mt: 2 }}>
+            <Paper sx={{ p: 2, mt: 2 }}>
               <Typography variant="h6">Leaderboard (Top Tippers by Amount)</Typography>
               <TableContainer>
                 <Table>
